@@ -1,0 +1,8 @@
+.buildozer/
+__pycache__/
+*.pyc
+*.pyo
+*.apk
+.env
+openai_api_key.txt
+settings.json

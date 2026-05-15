@@ -1,0 +1,44 @@
+[
+  {
+    "word": "sad",
+    "meaning": "asd",
+    "example": "asd",
+    "remaining": 5
+  },
+  {
+    "word": "asdasd",
+    "meaning": "asdasdsad, asdasd",
+    "example": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "remaining": 5
+  },
+  {
+    "word": "asddddddd",
+    "meaning": "dasdsdaad",
+    "example": "asddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "remaining": 5
+  },
+  {
+    "word": "sadasd",
+    "meaning": "asdasd",
+    "example": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "remaining": 5
+  },
+  {
+    "word": "asdasdasdasd",
+    "meaning": "sada",
+    "example": "ddsaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaadddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "remaining": 5
+  },
+  {
+    "word": "ddddddddddddd",
+    "meaning": "ddddddddddddddddddddddddd",
+    "example": "ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "remaining": 5
+  },
+  {
+    "word": "apple",
+    "meaning": "사과",
+    "example": "I ate an apple for breakfast.",
+    "remaining": 5
+  }
+]
