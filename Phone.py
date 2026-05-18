@@ -5,6 +5,7 @@ import ssl
 import threading
 import urllib.error
 import urllib.request
+from functools import lru_cache
 
 from kivy.app import App
 from kivy.clock import Clock
@@ -114,12 +115,17 @@ def _longest_unwrapped_width(widget):
 	if not longest:
 		return 0
 
-	label = CoreTextLabel(
-		text=longest,
-		font_size=widget.font_size,
-		font_name=getattr(widget, "font_name", DEFAULT_FONT),
-		bold=getattr(widget, "bold", False),
+	return _measure_text_width(
+		longest,
+		str(widget.font_size),
+		getattr(widget, "font_name", DEFAULT_FONT),
+		bool(getattr(widget, "bold", False)),
 	)
+
+
+@lru_cache(maxsize=512)
+def _measure_text_width(text, font_size, font_name, bold):
+	label = CoreTextLabel(text=text, font_size=font_size, font_name=font_name, bold=bold)
 	label.refresh()
 	return label.texture.size[0]
 
@@ -535,7 +541,7 @@ class AddWordScreen(Screen):
 			thread.start()
 			return
 
-		app.vocabulary.append({"word": word, "meaning": meaning, "example": example, "remaining": 5})
+		app.add_vocabulary_item(word, meaning, example)
 		app.save_vocabulary_data()
 		self.word_input.text = ""
 		self.meaning_input.text = ""
@@ -632,7 +638,7 @@ class AddWordScreen(Screen):
 			self.loading_popup.dismiss()
 			self.loading_popup = None
 
-		app.vocabulary.append({"word": word, "meaning": meaning, "example": example, "remaining": 5})
+		app.add_vocabulary_item(word, meaning, example)
 		app.save_vocabulary_data()
 		self.word_input.text = ""
 		self.meaning_input.text = ""
@@ -864,7 +870,7 @@ class StudyScreen(Screen):
 		item["remaining"] -= 1
 		if item["remaining"] <= 0:
 			mastered_word = item["word"]
-			app.vocabulary.remove(item)
+			app.remove_vocabulary_item(item)
 			app.show_message("학습 완료", f"{mastered_word}를 완전히 숙지했습니다!")
 
 		app.save_vocabulary_data()
@@ -1055,8 +1061,7 @@ class VocabularyListScreen(Screen):
 		popup = make_popup(title="단어 삭제", content=content, size_hint=(0.85, 0.35), auto_dismiss=False)
 
 		def do_delete(_instance):
-			if item in app.vocabulary:
-				app.vocabulary.remove(item)
+			if app.remove_vocabulary_item(item):
 				app.save_vocabulary_data()
 			popup.dismiss()
 			self.refresh_list()
@@ -1071,6 +1076,8 @@ class VocabularyApp(App):
 	def __init__(self, **kwargs):
 		super().__init__(**kwargs)
 		self.vocabulary = []
+		self.word_index = {}
+		self.vocabulary_item_ids = set()
 		self.study_sequence = []
 		self.study_position = 0
 		self.default_data_file_path = os.path.join(os.path.dirname(__file__), "vocabulary_data.json")
@@ -1078,6 +1085,7 @@ class VocabularyApp(App):
 		self.openai_api_key = ""
 		self.openai_model = OPENAI_MODEL
 		self.last_openai_error = ""
+		self._ssl_context = None
 
 	def build(self):
 		configure_korean_font()
@@ -1138,6 +1146,8 @@ class VocabularyApp(App):
 	def load_vocabulary_data(self):
 		if not os.path.exists(self.data_file_path):
 			self.vocabulary = []
+			self.word_index = {}
+			self.vocabulary_item_ids = set()
 			return
 
 		try:
@@ -1161,8 +1171,11 @@ class VocabularyApp(App):
 				loaded_items.append({"word": word, "meaning": meaning, "example": example, "remaining": remaining})
 
 			self.vocabulary = loaded_items
+			self._rebuild_vocabulary_index()
 		except Exception:
 			self.vocabulary = []
+			self.word_index = {}
+			self.vocabulary_item_ids = set()
 
 	def save_vocabulary_data(self):
 		serializable_items = []
@@ -1176,16 +1189,55 @@ class VocabularyApp(App):
 				}
 			)
 
-		with open(self.data_file_path, "w", encoding="utf-8") as file:
-			json.dump(serializable_items, file, ensure_ascii=False, indent=2)
+		data_dir = os.path.dirname(self.data_file_path)
+		os.makedirs(data_dir, exist_ok=True)
+		temp_path = f"{self.data_file_path}.tmp"
+		indent = None if platform == "android" else 2
+		separators = (",", ":") if platform == "android" else None
+
+		with open(temp_path, "w", encoding="utf-8") as file:
+			json.dump(serializable_items, file, ensure_ascii=False, indent=indent, separators=separators)
+
+		os.replace(temp_path, self.data_file_path)
+
+	def _normalize_word_key(self, word):
+		return str(word or "").strip().casefold()
+
+	def _rebuild_vocabulary_index(self):
+		self.word_index = {}
+		self.vocabulary_item_ids = set()
+		for item in self.vocabulary:
+			self.vocabulary_item_ids.add(id(item))
+			key = self._normalize_word_key(item.get("word", ""))
+			if key and key not in self.word_index:
+				self.word_index[key] = item
+
+	def add_vocabulary_item(self, word, meaning, example="", remaining=5):
+		item = {"word": word, "meaning": meaning, "example": example, "remaining": int(remaining)}
+		self.vocabulary.append(item)
+		self.vocabulary_item_ids.add(id(item))
+		key = self._normalize_word_key(word)
+		if key and key not in self.word_index:
+			self.word_index[key] = item
+		return item
+
+	def remove_vocabulary_item(self, item):
+		if item not in self.vocabulary:
+			return False
+
+		self.vocabulary.remove(item)
+		self.vocabulary_item_ids.discard(id(item))
+		key = self._normalize_word_key(item.get("word", ""))
+		if key and self.word_index.get(key) is item:
+			self.word_index.pop(key, None)
+			for candidate in self.vocabulary:
+				if self._normalize_word_key(candidate.get("word", "")) == key:
+					self.word_index[key] = candidate
+					break
+		return True
 
 	def find_word_item(self, word):
-		normalized_word = str(word).strip().lower()
-		for item in self.vocabulary:
-			item_word = str(item.get("word", "")).strip().lower()
-			if item_word == normalized_word:
-				return item
-		return None
+		return self.word_index.get(self._normalize_word_key(word))
 
 	def _split_meanings(self, meaning_text):
 		text = str(meaning_text or "")
@@ -1210,8 +1262,7 @@ class VocabularyApp(App):
 	def remove_meaning_from_item(self, item, meaning_to_remove):
 		target = str(meaning_to_remove).strip().lower()
 		if not target:
-			if item in self.vocabulary:
-				self.vocabulary.remove(item)
+			if self.remove_vocabulary_item(item):
 				return "word-removed"
 			return "not-found"
 
@@ -1222,8 +1273,7 @@ class VocabularyApp(App):
 			return "not-found"
 
 		if not remaining_parts:
-			if item in self.vocabulary:
-				self.vocabulary.remove(item)
+			if self.remove_vocabulary_item(item):
 				return "word-removed"
 			return "not-found"
 
@@ -1286,6 +1336,7 @@ class VocabularyApp(App):
 			restored_items.append({"word": word, "meaning": meaning, "example": example, "remaining": remaining})
 
 		self.vocabulary = restored_items
+		self._rebuild_vocabulary_index()
 		self.save_vocabulary_data()
 		return True, f"복원이 완료되었습니다. 단어 {len(restored_items)}개를 불러왔습니다."
 
@@ -1375,7 +1426,7 @@ class VocabularyApp(App):
 
 		while self.study_position < len(self.study_sequence):
 			item = self.study_sequence[self.study_position]
-			if item in self.vocabulary:
+			if id(item) in self.vocabulary_item_ids:
 				if "remaining" not in item:
 					item["remaining"] = 5
 				return item
@@ -1384,9 +1435,13 @@ class VocabularyApp(App):
 		return None
 
 	def _build_ssl_context(self):
+		if self._ssl_context is not None:
+			return self._ssl_context
+
 		if certifi:
 			try:
-				return ssl.create_default_context(cafile=certifi.where())
+				self._ssl_context = ssl.create_default_context(cafile=certifi.where())
+				return self._ssl_context
 			except Exception:
 				return None
 		return None

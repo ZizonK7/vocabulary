@@ -22,7 +22,7 @@ source.include_exts = py,json,png,txt,ttf,otf,ttc
 #source.exclude_exts = spec
 
 # (list) List of directory to exclude (let empty to not exclude anything)
-#source.exclude_dirs = tests, bin, venv
+source.exclude_dirs = .git,.venv,__pycache__,.buildozer,bin
 
 # (list) List of exclusions using pattern matching
 # Do not prefix with './'
